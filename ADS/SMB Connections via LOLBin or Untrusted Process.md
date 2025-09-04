@@ -58,7 +58,31 @@ Rule thực hiện **sequence trong 1 phút**:
   network: rundll32.exe → 10.10.5.23:445 (TCP)
   ```
 
+
 ---
+* **Logic rule (EQL)**:
+
+  ```eql
+  sequence by process.entity_id with maxspan=1m
+
+  /* first sequence to capture the start of Windows processes */
+  [process where host.os.type == "windows" and event.type == "start" and process.pid != 4 and
+
+    /* ignore NT Authority and Network Service accounts */
+    not user.id in ("S-1-5-19", "S-1-5-20") and
+
+    /* filter out anything trusted but not from Microsoft */
+    /* LOLBins will be inherently trusted and signed, so ignore everything else trusted */
+    not (process.code_signature.trusted == true and not startsWith(process.code_signature.subject_name, "Microsoft")) and
+
+    /* filter out PowerShell scripts from Windows Defender ATP */
+    not (
+      process.name : "powershell.exe" and
+      process.args :"?:\\ProgramData\\Microsoft\\Windows Defender Advanced Threat Protection\\Downloads\\PSScript_*.ps1")]
+
+  /* second sequence to capture network connections over port 445 related to SMB */
+  [network where host.os.type == "windows" and destination.port == 445 and process.pid != 4]
+  ```
 
 ## 🚧 Blind Spots and Assumptions
 
